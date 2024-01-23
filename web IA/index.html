@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IA JORGE</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f5f5f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+    
+        #webcam-container {
+            margin-bottom: 20px;
+            position: relative;
+            max-width: 600px; /* Ajusta el ancho máximo según sea necesario */
+            width: 100%;
+        }
+    
+        #label-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+    
+        #prediction-label {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 20px;
+            color: white;
+            background-color: #333;
+            padding: 5px;
+            border-radius: 5px;
+            display: none;
+        }
+    
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #ddd;
+            border-radius: 5px;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+    
+        .progress {
+            height: 100%;
+            background-color: #4caf50;
+            transition: width 0.5s ease;
+        }
+    
+        button {
+            padding: 10px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #4caf50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+    
+        button:hover {
+            background-color: #45a049;
+        }
+    
+        /* Añadir reglas de estilo para pantallas más pequeñas */
+        @media screen and (max-width: 600px) {
+            #webcam-container {
+                margin-bottom: 10px;
+            }
+    
+            .progress-bar {
+                margin-top: 5px;
+            }
+        }
+    </style>
+    
+</head>
+
+<body>
+    <h1>Reconocimiento WEB</h1>
+    <button type="button" onclick="init()">Iniciar</button>
+    <div id="webcam-container">
+        <div id="prediction-label"></div>
+        <div class="progress-bar">
+            <div id="airpods-progress" class="progress"></div>
+        </div>
+        <div class="progress-bar">
+            <div id="background-progress" class="progress"></div>
+        </div>
+    </div>
+    <div id="label-container"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+    <script type="text/javascript">
+        const URL = "https://teachablemachine.withgoogle.com/models/Mtktnmxk7/";
+
+        let model, webcam, labelContainer, maxPredictions;
+        let airpodsProgress, backgroundProgress;
+
+        async function init() {
+            const modelURL = URL + "model.json";
+            const metadataURL = URL + "metadata.json";
+
+            model = await tmImage.load(modelURL, metadataURL);
+            maxPredictions = model.getTotalClasses();
+
+            const flip = true;
+            webcam = new tmImage.Webcam(500, 500, flip);
+            await webcam.setup();
+            await webcam.play();
+            window.requestAnimationFrame(loop);
+
+            document.getElementById("webcam-container").appendChild(webcam.canvas);
+            labelContainer = document.getElementById("label-container");
+
+            // Inicializar barras de progreso
+            airpodsProgress = document.getElementById("airpods-progress");
+            backgroundProgress = document.getElementById("background-progress");
+            airpodsProgress.style.width = '0%';
+            backgroundProgress.style.width = '0%';
+
+            for (let i = 0; i < maxPredictions; i++) {
+                labelContainer.appendChild(document.createElement("div"));
+            }
+        }
+
+        async function loop() {
+            webcam.update();
+            await predict();
+            window.requestAnimationFrame(loop);
+        }
+
+        async function predict() {
+            const prediction = await model.predict(webcam.canvas);
+            const maxPredictionIndex = findMaxPredictionIndex(prediction);
+
+            const predictedClass = prediction[maxPredictionIndex].className;
+            const probability = prediction[maxPredictionIndex].probability.toFixed(2);
+
+            const predictionLabel = document.getElementById("prediction-label");
+            predictionLabel.innerHTML = `${predictedClass}: ${probability}`;
+            predictionLabel.style.display = "block";
+
+            // Actualizar barras de progreso
+            airpodsProgress.style.width = prediction[0].probability * 100 + '%';
+            backgroundProgress.style.width = prediction[1].probability * 100 + '%';
+
+            for (let i = 0; i < maxPredictions; i++) {
+                const classPrediction =
+                    prediction[i].className + ": " + prediction[i].probability.toFixed(2);
+                labelContainer.childNodes[i].innerHTML = classPrediction;
+            }
+        }
+
+        function findMaxPredictionIndex(predictions) {
+            let maxIndex = 0;
+            for (let i = 1; i < predictions.length; i++) {
+                if (predictions[i].probability > predictions[maxIndex].probability) {
+                    maxIndex = i;
+                }
+            }
+            return maxIndex;
+        }
+    </script>
+</body>
+
+</html>
